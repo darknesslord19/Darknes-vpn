@@ -32,7 +32,7 @@ object Scanner {
 
         var best: Preset? = null
         var bestScore = -1
-        val cands = Presets.candidates
+        val cands = Presets.candidates(ctx)
         for ((i, c) in cands.withIndex()) {
             progress("Deneniyor ${i + 1}/${cands.size}: ${c.title}")
             val p = Engine.startByeDpi(ctx, c.args, TEST_PORT, "test")

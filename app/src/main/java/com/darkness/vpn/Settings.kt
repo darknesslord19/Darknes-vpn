@@ -26,14 +26,6 @@ data class Settings(
     val customLink: String = "",
     val dns: String = "1.1.1.1",
 ) {
-    /**
-     * ByeDPI'a verilen gerçek argümanlar. "Sadece engelli siteler" modunda başa düz bir grup
-     * eklenir: bağlantılar önce olduğu gibi denenir, engel algılanırsa (zaman aşımı, sıfırlama,
-     * TLS hatası) yöntemler devreye girer ve o site 28 saat hatırlanır.
-     */
-    val effectiveDpiArgs: String
-        get() = if (routeMode == RouteMode.BLOCKED) "-T 4 -At,r,s $dpiArgs" else dpiArgs
-
     /** Kullanılacak ByeDPI argümanları. */
     val dpiArgs: String
         get() = if (presetId == Presets.CUSTOM_ID) customArgs.ifBlank { Presets.byId(Presets.DEFAULT_ID).args }
@@ -47,19 +39,19 @@ data class Settings(
     companion object {
         val DEFAULT_BLOCKED = listOf(
             "discord.com", "discord.gg", "discordapp.com", "discordapp.net", "discord.media",
-            "discordcdn.com", "roblox.com", "rbxcdn.com", "wattpad.com", "imgur.com",
+            "roblox.com", "wattpad.com", "pastebin.com", "4shared.com", "wikileaks.org", "bitly.com",
         )
 
         private fun prefs(ctx: Context): SharedPreferences =
             ctx.applicationContext.getSharedPreferences("gecit", Context.MODE_PRIVATE)
 
-        private const val VERSION = 2
+        private const val VERSION = 3
 
         fun load(ctx: Context): Settings {
             val p = prefs(ctx)
             if (p.getInt("version", 0) < VERSION) {
                 // v2: varsayılan yönlendirme "Her şey" oldu (DPI aşmada hız kaybı yok, daha güvenilir).
-                p.edit().putInt("version", VERSION).remove("routeMode").apply()
+                p.edit().putInt("version", VERSION).remove("routeMode").remove("blocked").remove("preset").apply()
             }
             val d = Settings()
             fun list(key: String, def: List<String>) =

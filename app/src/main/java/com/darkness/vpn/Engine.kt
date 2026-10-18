@@ -32,7 +32,7 @@ object Engine {
         val out = mutableListOf<String>()
         val cur = StringBuilder()
         var quote: Char? = null
-        for (c in s) {
+        for (c in s.replace("{sni}", "google.com")) {
             when {
                 quote != null && c == quote -> quote = null
                 quote == null && (c == '"' || c == '\'') -> quote = c

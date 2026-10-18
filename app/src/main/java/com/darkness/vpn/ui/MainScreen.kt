@@ -172,16 +172,17 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
         }
 
         // Trafik yönlendirme
-        Section("Hangi trafik tünelden geçsin?") {
-            val dpi = s.method == Method.DPI
-            RadioRow("Her şey",
-                if (dpi) "Bütün bağlantılara DPI aşma uygulanır. En güvenilir, hız kaybı yok." else "Bütün trafik seçili yoldan geçer.",
-                s.routeMode == RouteMode.ALL, badge = "ÖNERİLEN") { update { it.copy(routeMode = RouteMode.ALL) } }
-            Divider()
-            RadioRow("Sadece engelli siteler",
-                if (dpi) "Bağlantılar önce normal denenir; açılmayan siteleri uygulama kendisi öğrenir ve sadece onlara DPI aşma uygular."
-                else "Sadece listedeki siteler tünelden geçer, gerisi doğrudan. En az veri.",
-                s.routeMode == RouteMode.BLOCKED) { update { it.copy(routeMode = RouteMode.BLOCKED) } }
+        Section(
+            if (s.method == Method.DPI) "Engelli siteler" else "Hangi trafik tünelden geçsin?",
+            if (s.method == Method.DPI) "Bütün bağlantılar ByeDPI'dan geçer. Bu liste \"Otomatik bul\" ve \"tara\" için kullanılır; DPI ile açılmayanlar WARP'a yönlendirilir." else null
+        ) {
+            if (s.method != Method.DPI) {
+                RadioRow("Her şey", "Bütün trafik seçili yoldan geçer.",
+                    s.routeMode == RouteMode.ALL, badge = "ÖNERİLEN") { update { it.copy(routeMode = RouteMode.ALL) } }
+                Divider()
+                RadioRow("Sadece engelli siteler", "Sadece listedeki siteler tünelden geçer, gerisi doğrudan. En az veri.",
+                    s.routeMode == RouteMode.BLOCKED) { update { it.copy(routeMode = RouteMode.BLOCKED) } }
+            }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${s.blockedSites.size} site test listesinde · ", color = C.sub, fontSize = 14.sp)

@@ -138,7 +138,7 @@ class GecitVpnService : VpnService() {
             // 3) ByeDPI
             if (s.method == Method.DPI) {
                 step("ByeDPI başlatılıyor")
-                val p = Engine.startByeDpi(this, s.effectiveDpiArgs, XrayConfig.DPI_PORT)
+                val p = Engine.startByeDpi(this, s.dpiArgs, XrayConfig.DPI_PORT)
                 byedpi = p
                 if (!Engine.waitPort(XrayConfig.DPI_PORT, 4000) { p.isAlive })
                     throw IllegalStateException("ByeDPI başlamadı. Ayarları kontrol et (Gelişmiş → Kayıtlar).")
@@ -157,12 +157,10 @@ class GecitVpnService : VpnService() {
             val b = Builder()
                 .setSession(getString(R.string.app_name))
                 .setMtu(8500)
-                .addAddress("198.18.0.1", 32)
-                .addAddress("fc00::1", 128)
+                .addAddress("10.10.10.10", 32)
                 .addRoute("0.0.0.0", 0)
-                .addRoute("::", 0)
                 .addDnsServer(s.dns.ifBlank { "1.1.1.1" })
-                .setBlocking(false)
+            runCatching { b.addAddress("fd00::1", 128).addRoute("::", 0) }
             if (Build.VERSION.SDK_INT >= 29) b.setMetered(false)
             applyApps(b, s)
             b.setConfigureIntent(PendingIntent.getActivity(this, 0,
@@ -172,21 +170,10 @@ class GecitVpnService : VpnService() {
 
             // 6) hev-socks5-tunnel
             val hevConf = File(filesDir, "hev.yml")
+            // Çalışan CloudStream sürümüyle birebir aynı tünel ayarı
             hevConf.writeText(
-                """
-                tunnel:
-                  mtu: 8500
-                  ipv4: 198.18.0.1
-                  ipv6: 'fc00::1'
-                socks5:
-                  port: ${XrayConfig.SOCKS_PORT}
-                  address: 127.0.0.1
-                  udp: 'udp'
-                misc:
-                  task-stack-size: 81920
-                  log-file: ${Engine.hevLog(this).absolutePath}
-                  log-level: warn
-                """.trimIndent() + "\n"
+                "tunnel:\n  mtu: 8500\nmisc:\n  task-stack-size: 81920\n" +
+                    "socks5:\n  address: 127.0.0.1\n  port: ${XrayConfig.SOCKS_PORT}\n  udp: udp\n"
             )
             Engine.hevLog(this).writeText("")
             if (!TProxyService.TProxyStartService(hevConf.absolutePath, fd.fd))

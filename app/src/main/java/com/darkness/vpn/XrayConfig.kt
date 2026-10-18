@@ -33,11 +33,15 @@ object XrayConfig {
 
         val outbounds = JSONArray()
         outbounds.put(JSONObject().put("tag", "direct").put("protocol", "freedom")
-            .put("streamSettings", JSONObject().put("sockopt", JSONObject().put("domainStrategy", "UseIP"))))
+            .put("settings", JSONObject().put("domainStrategy", "UseIPv4")))
         outbounds.put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
         outbounds.put(JSONObject().put("tag", "dns-out").put("protocol", "dns"))
-        outbounds.put(JSONObject().put("tag", "dpi").put("protocol", "socks")
-            .put("settings", JSONObject().put("address", "127.0.0.1").put("port", dpiPort)))
+        // Çalışan CloudStream sürümüyle aynı: Xray adı DoH ile çözer, bağlantıyı ByeDPI üzerinden açar.
+        outbounds.put(JSONObject().put("tag", "dpi").put("protocol", "freedom")
+            .put("settings", JSONObject().put("domainStrategy", "UseIPv4"))
+            .put("streamSettings", JSONObject().put("sockopt", JSONObject().put("dialerProxy", "byedpi"))))
+        outbounds.put(JSONObject().put("tag", "byedpi").put("protocol", "socks")
+            .put("settings", JSONObject().put("servers", JSONArray().put(JSONObject().put("address", "127.0.0.1").put("port", dpiPort)))))
         if (warp != null) outbounds.put(warpOutbound(warp, s.warpEndpoint))
         if (custom != null) outbounds.put(resolveAddress(JSONObject(custom.toString())))
 
@@ -56,10 +60,11 @@ object XrayConfig {
                 rule("domain" to domains(s.warpSites), "outboundTag" to "warp")
             }
             if (s.method == Method.DPI) {
-                // DPI aşmada bütün trafik ByeDPI'dan geçer; hangi sitenin engelli olduğunu
-                // ByeDPI kendisi algılar (bkz. Settings.effectiveDpiArgs). Hız kaybı yoktur.
+                // ByeDPI UDP'yi değiştirmez: oyun, arama vb. doğrudan gider. QUIC kapatılırsa
+                // tarayıcılar TCP'ye geçer ve ByeDPI'dan geçer.
                 if (s.blockQuic) rule("network" to "udp", "port" to "443", "outboundTag" to "block")
-                rule("network" to "tcp,udp", "outboundTag" to "dpi")
+                rule("network" to "udp", "outboundTag" to "direct")
+                rule("network" to "tcp", "outboundTag" to "dpi")
             } else if (s.routeMode == RouteMode.BLOCKED) {
                 if (s.blockedSites.isNotEmpty()) rule("domain" to domains(s.blockedSites), "outboundTag" to method)
                 rule("network" to "tcp,udp", "outboundTag" to "direct")
@@ -78,7 +83,7 @@ object XrayConfig {
                 .put("tag", "in").put("listen", "127.0.0.1").put("port", socksPort).put("protocol", "socks")
                 .put("settings", JSONObject().put("auth", "noauth").put("udp", true).put("ip", "127.0.0.1"))
                 .put("sniffing", JSONObject().put("enabled", true)
-                    .put("destOverride", JSONArray(listOf("http", "tls", "quic"))).put("routeOnly", true))))
+                    .put("destOverride", JSONArray(listOf("http", "tls", "quic"))))))
             .put("outbounds", outbounds)
             .put("routing", JSONObject().put("domainStrategy", "AsIs").put("rules", rules))
         return root.toString(2)
