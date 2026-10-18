@@ -63,6 +63,7 @@ class GecitVpnService : VpnService() {
     private var byedpi: Process? = null
     private var xray: Process? = null
     @Volatile private var running = false
+    @Volatile private var hevStarted = false
     @Volatile private var generation = 0
     private val lock = Any()
 
@@ -176,11 +177,12 @@ class GecitVpnService : VpnService() {
                     "socks5:\n  address: 127.0.0.1\n  port: ${XrayConfig.SOCKS_PORT}\n  udp: udp\n"
             )
             Engine.hevLog(this).writeText("")
-            if (!TProxyService.TProxyStartService(hevConf.absolutePath, fd.fd))
-                throw IllegalStateException("Tünel başlatılamadı.")
-            Thread.sleep(400)
-            if (!TProxyService.TProxyIsRunning())
-                throw IllegalStateException("Tünel hemen kapandı. Kayıtlar'a bak.")
+            try {
+                TProxyService.TProxyStartService(hevConf.absolutePath, fd.fd)
+            } catch (e: Throwable) {
+                throw IllegalStateException("Tünel başlatılamadı: ${e.javaClass.simpleName} ${e.message ?: ""}")
+            }
+            hevStarted = true
             running = true
 
             VpnState.status.value = VpnStatus.On(s.method, System.currentTimeMillis())
@@ -189,7 +191,7 @@ class GecitVpnService : VpnService() {
             watch()
             monitor()
         } catch (e: Throwable) {
-            Engine.log(this, "HATA: ${e.message}")
+            Engine.log(this, "HATA: ${e.javaClass.simpleName}: ${e.message}")
             teardown()
             VpnState.status.value = VpnStatus.Error(e.message ?: e.javaClass.simpleName)
             stopSelfFully()
@@ -280,7 +282,8 @@ class GecitVpnService : VpnService() {
 
     private fun teardown() {
         running = false
-        runCatching { if (TProxyService.TProxyIsRunning()) TProxyService.TProxyStopService() }
+        if (hevStarted) runCatching { TProxyService.TProxyStopService() }
+        hevStarted = false
         runCatching { tun?.close() }
         tun = null
         Engine.stop(xray); xray = null

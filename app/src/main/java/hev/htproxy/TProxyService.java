@@ -1,10 +1,9 @@
 package hev.htproxy;
 
-/** hev-socks5-tunnel JNI bağlantısı (varsayılan PKGNAME/CLSNAME). */
+/** hev-socks5-tunnel JNI bağlantısı (sabitlenen sürümdeki imzalar). */
 public final class TProxyService {
-    public static native boolean TProxyStartService(String config_path, int fd);
-    public static native boolean TProxyStopService();
-    public static native boolean TProxyIsRunning();
+    public static native void TProxyStartService(String config_path, int fd);
+    public static native void TProxyStopService();
     public static native long[] TProxyGetStats();
 
     static {
