@@ -4,7 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings as SysSettings
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,22 +71,39 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
         if (s.autoConnectOnOpen && status !is VpnStatus.On && status !is VpnStatus.Connecting) onConnect()
     }
 
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val homeScroll = rememberScrollState()
+    val settingsScroll = rememberScrollState()
+
+    Box(Modifier.fillMaxSize().background(C.bg)) {
+    AnimatedContent(
+        targetState = tab, label = "tab",
+        transitionSpec = {
+            val dir = if (targetState > initialState) 1 else -1
+            (slideInHorizontally { it * dir / 6 } + fadeIn()) togetherWith (slideOutHorizontally { -it * dir / 6 } + fadeOut())
+        }
+    ) { page ->
+    if (page == 0) {
+        Column(
+            Modifier.fillMaxSize().statusBarsPadding().verticalScroll(homeScroll)
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 130.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            BrandHeader(s)
+            PowerCard(status, s) { if (status is VpnStatus.On || status is VpnStatus.Connecting) onDisconnect() else onConnect() }
+        }
+    } else {
     Column(
-        Modifier.fillMaxSize().background(C.bg).systemBarsPadding()
-            .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxSize().statusBarsPadding()
+            .verticalScroll(settingsScroll).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 130.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Başlık
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("VPN", color = C.text, fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            val scopeLabel = if (s.appMode == AppMode.ALL || (s.appMode == AppMode.ONLY && s.apps.isEmpty())) "Tüm telefon"
-            else if (s.appMode == AppMode.ONLY) "${s.apps.size} uygulama" else "Seçtiklerim hariç"
-            Text(scopeLabel, color = C.sub, fontSize = 14.sp,
-                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(C.card).padding(horizontal = 14.dp, vertical = 8.dp))
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
+            Text("Ayarlar", color = C.text, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text("Bağlantı, görünüm ve uygulamalar", color = C.sub, fontSize = 14.sp)
         }
 
-        // Güç düğmesi
-        PowerCard(status, s) { if (status is VpnStatus.On || status is VpnStatus.Connecting) onDisconnect() else onConnect() }
+        ThemeSection()
 
         // Bağlantı türü
         Section("Bağlantı türü", "Bağlanmak için kullanılacak yol.") {
@@ -228,7 +256,7 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
         }
 
         // Genel ayarlar
-        Section("Ayarlar") {
+        Section("Genel") {
             SwitchRow("Açılışta otomatik bağlan", "Uygulama açılınca VPN de açılır", s.autoConnectOnOpen) { v ->
                 update(reload = false) { it.copy(autoConnectOnOpen = v) }
             }
@@ -242,7 +270,7 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
             }.padding(vertical = 12.dp)) {
                 Column {
                     Text("Her zaman açık VPN", color = C.text, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("Sistem ayarlarından Darkness VPN'i \"her zaman açık\" yap; koparsa internet kesilsin istersen \"VPN olmadan bağlantıları engelle\"yi de aç.",
+                    Text("Sistem ayarlarından Darknes VPN'i \"her zaman açık\" yap; koparsa internet kesilsin istersen \"VPN olmadan bağlantıları engelle\"yi de aç.",
                         color = C.sub, fontSize = 13.sp, lineHeight = 18.sp)
                 }
             }
@@ -251,8 +279,18 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
         // Bağlantı testi
         ConnectionTest(status)
 
-        Text("ByeDPI · Xray · hev-socks5-tunnel", color = C.sub, fontSize = 13.sp,
+        Text("Darknes VPN · ByeDPI · Xray · hev-socks5-tunnel", color = C.sub, fontSize = 13.sp,
             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+    }
+    }
+    }
+
+    NotchedBottomBar(
+        items = listOf(NavItem("Ana sayfa", Icons.Rounded.Home), NavItem("Ayarlar", Icons.Rounded.Settings)),
+        selected = tab, onSelect = { tab = it },
+        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
+    )
     }
 
     when (dialog) {
@@ -488,5 +526,100 @@ private fun IpBox(main: String, sub: String, modifier: Modifier) {
         Text(main, color = C.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         Text(sub, color = C.sub, fontSize = 12.sp, maxLines = 1)
+    }
+}
+
+
+/** Ana sayfa başlığı: "Darknes" degrade yazı + VPN rozeti ve canlı durum noktası. */
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+@Composable
+private fun BrandHeader(s: Settings) {
+    val status by VpnState.flow.collectAsState()
+    val on = status is VpnStatus.On
+    Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Darknes",
+                    style = androidx.compose.ui.text.TextStyle(
+                        brush = Brush.linearGradient(listOf(C.text, C.accent, C.accent2)),
+                        fontSize = 34.sp, fontWeight = FontWeight.Black, letterSpacing = (-0.5).sp,
+                    )
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "VPN", color = C.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                        .background(Brush.linearGradient(listOf(C.accent, C.accent2)))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+            Text("Engelsiz internet, tek dokunuş", color = C.sub, fontSize = 13.sp)
+        }
+        val pulse by rememberInfiniteTransition(label = "dot").animateFloat(
+            0.35f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "d"
+        )
+        Row(
+            Modifier.clip(RoundedCornerShape(20.dp)).background(C.card).border(1.dp, C.border, RoundedCornerShape(20.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (on) C.green.copy(alpha = pulse) else C.sub.copy(alpha = 0.5f)))
+            Spacer(Modifier.width(8.dp))
+            val scopeLabel = if (s.appMode == AppMode.ALL || (s.appMode == AppMode.ONLY && s.apps.isEmpty())) "Tüm telefon"
+                else if (s.appMode == AppMode.ONLY) "${s.apps.size} uygulama" else "Seçtiklerim hariç"
+            Text(scopeLabel, color = C.sub, fontSize = 13.sp)
+        }
+    }
+}
+
+/** 10 Monet tarzı tema seçici. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ThemeSection() {
+    val ctx = LocalContext.current
+    var current by remember { mutableStateOf(Themes.currentId(ctx)) }
+    Section("Görünüm", "Monet tarzı temalar · \"Duvar kağıdı\" renkleri telefonundan alır") {
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            maxItemsInEachRow = 5
+        ) {
+            Themes.list.forEach { t ->
+                val enabled = !t.dynamic || Themes.dynamicSupported()
+                val (accent, surface) = remember(t.id) { Themes.preview(ctx, t) }
+                val selected = current == t.id
+                Column(
+                    Modifier.width(60.dp).clip(RoundedCornerShape(14.dp))
+                        .clickable(enabled = enabled) { Themes.select(ctx, t.id); current = t.id }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        Modifier.size(50.dp).clip(CircleShape)
+                            .border(if (selected) 3.dp else 1.dp, if (selected) C.accent else C.border, CircleShape)
+                            .padding(if (selected) 5.dp else 2.dp)
+                            .clip(CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            drawRect(surface)
+                            drawArc(accent, 180f, 180f, true)
+                            drawCircle(accent.copy(alpha = 0.55f), radius = size.minDimension * 0.16f,
+                                center = Offset(size.width * 0.72f, size.height * 0.74f))
+                        }
+                        if (t.dynamic) Text("M", color = C.onAccent, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(t.name, color = if (enabled) (if (selected) C.accent else C.sub) else C.border,
+                        fontSize = 10.sp, maxLines = 1, textAlign = TextAlign.Center)
+                }
+            }
+        }
+        if (!Themes.dynamicSupported()) {
+            Spacer(Modifier.height(8.dp))
+            Text("\"Duvar kağıdı\" teması Android 12 ve üstünde çalışır.", color = C.sub, fontSize = 12.sp)
+        }
     }
 }

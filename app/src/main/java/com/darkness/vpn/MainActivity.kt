@@ -10,7 +10,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
-import com.darkness.vpn.ui.GecitColors
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import com.darkness.vpn.ui.C
+import com.darkness.vpn.ui.Themes
+import com.darkness.vpn.ui.gecitColors
 import com.darkness.vpn.ui.MainScreen
 
 class MainActivity : ComponentActivity() {
@@ -28,8 +32,11 @@ class MainActivity : ComponentActivity() {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
 
+        Themes.apply(this)
         setContent {
-            MaterialTheme(colorScheme = GecitColors) {
+            val bar = C.bg.toArgb()
+            SideEffect { window.statusBarColor = bar; window.navigationBarColor = bar }
+            MaterialTheme(colorScheme = gecitColors()) {
                 MainScreen(onConnect = ::connect, onDisconnect = { GecitVpnService.stop(this) })
             }
         }

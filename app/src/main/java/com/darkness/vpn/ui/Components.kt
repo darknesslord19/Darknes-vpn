@@ -9,6 +9,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,15 +20,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Uygulamanın renkleri. Değerler Compose durumu olduğu için tema değişince
+ * bütün ekran kendiliğinden yeniden çizilir (bkz. Themes.apply).
+ */
 object C {
-    val bg = Color(0xFF0E0E10)
-    val card = Color(0xFF18181B)
-    val inner = Color(0xFF1F1F23)
-    val border = Color(0xFF2C2C31)
-    val text = Color(0xFFF2F2F3)
-    val sub = Color(0xFFA2A2AA)
-    val accent = Color(0xFFE6C48E)
-    val onAccent = Color(0xFF1A1408)
+    var bg by mutableStateOf(Color(0xFF0E0E10))
+    var card by mutableStateOf(Color(0xFF18181B))
+    var inner by mutableStateOf(Color(0xFF1F1F23))
+    var border by mutableStateOf(Color(0xFF2C2C31))
+    var text by mutableStateOf(Color(0xFFF2F2F3))
+    var sub by mutableStateOf(Color(0xFFA2A2AA))
+    var accent by mutableStateOf(Color(0xFFE6C48E))
+    var onAccent by mutableStateOf(Color(0xFF1A1408))
+    var accent2 by mutableStateOf(Color(0xFFB98A4E))
+    var nav by mutableStateOf(Color(0xFF1C1C20))
     val green = Color(0xFF4CC38A)
     val greenBg = Color(0xFF1C3328)
     val orange = Color(0xFFF08A2E)
@@ -33,7 +42,8 @@ object C {
     val red = Color(0xFFE5675F)
 }
 
-val GecitColors = darkColorScheme(
+@Composable
+fun gecitColors() = darkColorScheme(
     primary = C.accent, onPrimary = C.onAccent, background = C.bg, surface = C.card,
     onSurface = C.text, onBackground = C.text, surfaceVariant = C.inner, outline = C.border,
 )
@@ -48,7 +58,12 @@ fun Section(title: String, subtitle: String? = null, content: @Composable Column
             .border(1.dp, C.border, RoundedCornerShape(28.dp))
             .padding(20.dp)
     ) {
-        Text(title, color = C.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(width = 4.dp, height = 20.dp).clip(RoundedCornerShape(2.dp))
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(C.accent, C.accent2))))
+            Spacer(Modifier.width(10.dp))
+            Text(title, color = C.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        }
         if (subtitle != null) {
             Spacer(Modifier.height(4.dp))
             Text(subtitle, color = C.sub, fontSize = 14.sp)

@@ -32,20 +32,20 @@ jobs:
       - name: APK adını düzenle
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/*.apk "dist/DarknessVPN-${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/*.apk "dist/DarknesVPN-${{ github.run_number }}.apk"
           ls -la dist
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DarknessVPN-${{ github.run_number }}
+          name: DarknesVPN-${{ github.run_number }}
           path: dist/*.apk
 
       - name: Sürüm yayınla (telefondan kolay indirmek için)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Darkness VPN ${{ github.run_number }}
+          name: Darknes VPN ${{ github.run_number }}
           make_latest: true
           files: dist/*.apk
           body: |
-            Telefondan indir: aşağıdaki **DarknessVPN-${{ github.run_number }}.apk** dosyasına dokun.
+            Telefondan indir: aşağıdaki **DarknesVPN-${{ github.run_number }}.apk** dosyasına dokun.

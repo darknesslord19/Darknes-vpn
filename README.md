@@ -1,4 +1,4 @@
-# Darkness VPN
+# Darknes VPN
 
 ByeDPI ile WARP'ı birleştiren, telefonun tamamını kapsayan Android VPN uygulaması.
 
@@ -12,7 +12,7 @@ ByeDPI ile WARP'ı birleştiren, telefonun tamamını kapsayan Android VPN uygul
 
 ## İndirme
 
-[Releases](../../releases/latest) sayfasındaki en son `DarknessVPN-*.apk` dosyasını telefona indirip kur.
+[Releases](../../releases/latest) sayfasındaki en son `DarknesVPN-*.apk` dosyasını telefona indirip kur.
 Şimdilik yalnızca 64 bit ARM (arm64-v8a) telefonlar desteklenir; günümüzdeki telefonların neredeyse hepsi böyledir.
 
 ## Derleme
