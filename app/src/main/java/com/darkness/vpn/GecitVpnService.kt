@@ -22,7 +22,20 @@ sealed class VpnStatus {
     data class Error(val message: String) : VpnStatus()
 }
 
+/** Bağlıyken canlı bilgiler. */
+data class VpnStats(
+    val ip: String? = null,
+    val country: String? = null,
+    val pingMs: Long? = null,
+    val tunnelOk: Boolean? = null,
+    val rxBytes: Long = 0,
+    val txBytes: Long = 0,
+    val rxSpeed: Long = 0,
+    val txSpeed: Long = 0,
+)
+
 object VpnState {
+    val stats = MutableStateFlow(VpnStats())
     val status = MutableStateFlow<VpnStatus>(VpnStatus.Off)
     val flow: StateFlow<VpnStatus> get() = status
     val isOn get() = status.value is VpnStatus.On
@@ -99,14 +112,20 @@ class GecitVpnService : VpnService() {
 
             // 1) WARP hesabı
             var warp: WarpAccount? = null
-            if (s.needsWarp) {
+            if (s.method == Method.WARP) {
                 step("WARP hesabı hazırlanıyor")
-                warp = try {
-                    Warp.ensure(this)
-                } catch (e: Exception) {
-                    if (s.method == Method.WARP) throw e
-                    Engine.log(this, "WARP hesabı alınamadı, yedek kapalı: ${e.message}")
-                    null
+                warp = Warp.ensure(this)
+            } else if (s.needsWarp) {
+                // Yedek için hesap gerekiyor ama bağlantıyı bekletmeyelim: arka planda açılır, sonra yeniden yüklenir.
+                warp = Warp.account(this)
+                if (warp == null) thread(isDaemon = true) {
+                    try {
+                        Warp.register(this)
+                        Engine.log(this, "WARP hesabı açıldı, yedek etkinleşiyor")
+                        if (running) reload(this)
+                    } catch (e: Exception) {
+                        Engine.log(this, "WARP hesabı alınamadı, yedek şimdilik kapalı: ${e.message}")
+                    }
                 }
             }
 
@@ -119,7 +138,7 @@ class GecitVpnService : VpnService() {
             // 3) ByeDPI
             if (s.method == Method.DPI) {
                 step("ByeDPI başlatılıyor")
-                val p = Engine.startByeDpi(this, s.dpiArgs, XrayConfig.DPI_PORT)
+                val p = Engine.startByeDpi(this, s.effectiveDpiArgs, XrayConfig.DPI_PORT)
                 byedpi = p
                 if (!Engine.waitPort(XrayConfig.DPI_PORT, 4000) { p.isAlive })
                     throw IllegalStateException("ByeDPI başlamadı. Ayarları kontrol et (Gelişmiş → Kayıtlar).")
@@ -165,17 +184,23 @@ class GecitVpnService : VpnService() {
                   udp: 'udp'
                 misc:
                   task-stack-size: 81920
+                  log-file: ${Engine.hevLog(this).absolutePath}
                   log-level: warn
                 """.trimIndent() + "\n"
             )
+            Engine.hevLog(this).writeText("")
             if (!TProxyService.TProxyStartService(hevConf.absolutePath, fd.fd))
                 throw IllegalStateException("Tünel başlatılamadı.")
+            Thread.sleep(400)
+            if (!TProxyService.TProxyIsRunning())
+                throw IllegalStateException("Tünel hemen kapandı. Kayıtlar'a bak.")
             running = true
 
             VpnState.status.value = VpnStatus.On(s.method, System.currentTimeMillis())
             Engine.log(this, "=== Bağlandı ===")
             notify(notification("Bağlı · " + methodName(s)))
             watch()
+            monitor()
         } catch (e: Throwable) {
             Engine.log(this, "HATA: ${e.message}")
             teardown()
@@ -222,6 +247,47 @@ class GecitVpnService : VpnService() {
                     break
                 }
             }
+        }
+    }
+
+    /** Canlı istatistikler: hız, toplam veri, gecikme, görünen IP; tünelin gerçekten çalıştığını da sınar. */
+    private fun monitor() {
+        val gen = generation
+        VpnState.stats.value = VpnStats()
+        thread(isDaemon = true, name = "vpn-stats") {
+            var lastRx = 0L; var lastTx = 0L
+            var tick = 0
+            while (running && gen == generation) {
+                val st = runCatching { TProxyService.TProxyGetStats() }.getOrNull()
+                if (st != null && st.size >= 4) {
+                    val tx = st[1]; val rx = st[3]
+                    VpnState.stats.value = VpnState.stats.value.copy(
+                        rxBytes = rx, txBytes = tx,
+                        rxSpeed = (rx - lastRx).coerceAtLeast(0), txSpeed = (tx - lastTx).coerceAtLeast(0),
+                    )
+                    lastRx = rx; lastTx = tx
+                }
+                if (tick % 20 == 0) probe(tick == 0)
+                tick++
+                Thread.sleep(1000)
+            }
+        }
+    }
+
+    private fun probe(first: Boolean) {
+        thread(isDaemon = true) {
+            val ping = Net.ping(XrayConfig.SOCKS_PORT)
+            var cur = VpnState.stats.value.copy(pingMs = ping, tunnelOk = ping != null)
+            if (first || cur.ip == null) {
+                val info = Net.ipInfo(XrayConfig.SOCKS_PORT)
+                cur = cur.copy(ip = info?.ip, country = info?.country)
+                if (first) Engine.log(this, if (ping != null) "Tünel testi: çalışıyor, ${ping} ms, IP ${info?.ip}"
+                    else "UYARI: tünelden internete çıkılamadı. DPI ayarını değiştir ya da WARP'ı dene.")
+            }
+            if (running) VpnState.stats.value = cur.copy(
+                rxBytes = VpnState.stats.value.rxBytes, txBytes = VpnState.stats.value.txBytes,
+                rxSpeed = VpnState.stats.value.rxSpeed, txSpeed = VpnState.stats.value.txSpeed,
+            )
         }
     }
 

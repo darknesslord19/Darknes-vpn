@@ -33,7 +33,7 @@ object XrayConfig {
 
         val outbounds = JSONArray()
         outbounds.put(JSONObject().put("tag", "direct").put("protocol", "freedom")
-            .put("settings", JSONObject().put("domainStrategy", "UseIP")))
+            .put("streamSettings", JSONObject().put("sockopt", JSONObject().put("domainStrategy", "UseIP"))))
         outbounds.put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
         outbounds.put(JSONObject().put("tag", "dns-out").put("protocol", "dns"))
         outbounds.put(JSONObject().put("tag", "dpi").put("protocol", "socks")
@@ -55,13 +55,12 @@ object XrayConfig {
             if (s.method == Method.DPI && s.warpFallback && hasWarp && s.warpSites.isNotEmpty()) {
                 rule("domain" to domains(s.warpSites), "outboundTag" to "warp")
             }
-            if (s.method == Method.DPI && s.blockQuic) {
-                // QUIC'i kapatınca tarayıcı TCP'ye düşer, ByeDPI orada çalışır.
-                if (s.routeMode == RouteMode.ALL) rule("network" to "udp", "port" to "443", "outboundTag" to "block")
-                else if (s.blockedSites.isNotEmpty())
-                    rule("network" to "udp", "port" to "443", "domain" to domains(s.blockedSites), "outboundTag" to "block")
-            }
-            if (s.routeMode == RouteMode.BLOCKED) {
+            if (s.method == Method.DPI) {
+                // DPI aşmada bütün trafik ByeDPI'dan geçer; hangi sitenin engelli olduğunu
+                // ByeDPI kendisi algılar (bkz. Settings.effectiveDpiArgs). Hız kaybı yoktur.
+                if (s.blockQuic) rule("network" to "udp", "port" to "443", "outboundTag" to "block")
+                rule("network" to "tcp,udp", "outboundTag" to "dpi")
+            } else if (s.routeMode == RouteMode.BLOCKED) {
                 if (s.blockedSites.isNotEmpty()) rule("domain" to domains(s.blockedSites), "outboundTag" to method)
                 rule("network" to "tcp,udp", "outboundTag" to "direct")
             } else {

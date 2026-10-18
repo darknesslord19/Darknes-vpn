@@ -19,8 +19,13 @@ object Engine {
         f.appendText(line.trimEnd() + "\n")
     }
 
-    fun readLog(ctx: Context, lines: Int = 300): String =
-        logFile(ctx).takeIf { it.exists() }?.readLines()?.takeLast(lines)?.joinToString("\n") ?: "(kayıt yok)"
+    fun hevLog(ctx: Context) = File(ctx.filesDir, "hev.log")
+
+    fun readLog(ctx: Context, lines: Int = 300): String {
+        val main = logFile(ctx).takeIf { it.exists() }?.readLines()?.takeLast(lines)?.joinToString("\n") ?: "(kayıt yok)"
+        val hev = hevLog(ctx).takeIf { it.exists() && it.length() > 0 }?.readLines()?.takeLast(60)?.joinToString("\n")
+        return if (hev != null) "$main\n\n--- tünel ---\n$hev" else main
+    }
 
     /** ByeDPI argümanlarını kabaca böler (tırnak desteğiyle). */
     fun splitArgs(s: String): List<String> {

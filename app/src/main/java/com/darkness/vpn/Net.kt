@@ -70,6 +70,23 @@ object Net {
         }
     }
 
+    /** SOCKS üzerinden küçük bir HTTPS isteğinin süresi (ms); başarısızsa null. */
+    fun ping(socksPort: Int?): Long? {
+        repeat(2) {
+            try {
+                val proxy = socksPort?.let { Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", it)) } ?: Proxy.NO_PROXY
+                val t0 = System.nanoTime()
+                val conn = URL("https://www.google.com/generate_204").openConnection(proxy) as HttpURLConnection
+                conn.connectTimeout = 6000; conn.readTimeout = 6000; conn.useCaches = false
+                val code = conn.responseCode
+                conn.disconnect()
+                if (code in 200..399) return (System.nanoTime() - t0) / 1_000_000
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
     data class IpInfo(val ip: String, val country: String)
 
     /** Cloudflare trace ile dışarıdan görünen IP ve ülke. */

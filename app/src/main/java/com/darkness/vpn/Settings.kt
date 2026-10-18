@@ -13,7 +13,7 @@ data class Settings(
     val presetId: String = Presets.DEFAULT_ID,
     val customArgs: String = "",
     val warpFallback: Boolean = true,
-    val routeMode: RouteMode = RouteMode.BLOCKED,
+    val routeMode: RouteMode = RouteMode.ALL,
     val blockedSites: List<String> = DEFAULT_BLOCKED,
     val warpSites: List<String> = emptyList(),
     val coverApps: Boolean = true,
@@ -26,6 +26,14 @@ data class Settings(
     val customLink: String = "",
     val dns: String = "1.1.1.1",
 ) {
+    /**
+     * ByeDPI'a verilen gerçek argümanlar. "Sadece engelli siteler" modunda başa düz bir grup
+     * eklenir: bağlantılar önce olduğu gibi denenir, engel algılanırsa (zaman aşımı, sıfırlama,
+     * TLS hatası) yöntemler devreye girer ve o site 28 saat hatırlanır.
+     */
+    val effectiveDpiArgs: String
+        get() = if (routeMode == RouteMode.BLOCKED) "-T 4 -At,r,s $dpiArgs" else dpiArgs
+
     /** Kullanılacak ByeDPI argümanları. */
     val dpiArgs: String
         get() = if (presetId == Presets.CUSTOM_ID) customArgs.ifBlank { Presets.byId(Presets.DEFAULT_ID).args }
@@ -45,8 +53,14 @@ data class Settings(
         private fun prefs(ctx: Context): SharedPreferences =
             ctx.applicationContext.getSharedPreferences("gecit", Context.MODE_PRIVATE)
 
+        private const val VERSION = 2
+
         fun load(ctx: Context): Settings {
             val p = prefs(ctx)
+            if (p.getInt("version", 0) < VERSION) {
+                // v2: varsayılan yönlendirme "Her şey" oldu (DPI aşmada hız kaybı yok, daha güvenilir).
+                p.edit().putInt("version", VERSION).remove("routeMode").apply()
+            }
             val d = Settings()
             fun list(key: String, def: List<String>) =
                 p.getString(key, null)?.split('\n')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: def

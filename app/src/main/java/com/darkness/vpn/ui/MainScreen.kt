@@ -67,7 +67,7 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
     ) {
         // Başlık
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Darkness VPN", color = C.text, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("VPN", color = C.text, fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             val scopeLabel = if (s.appMode == AppMode.ALL || (s.appMode == AppMode.ONLY && s.apps.isEmpty())) "Tüm telefon"
             else if (s.appMode == AppMode.ONLY) "${s.apps.size} uygulama" else "Seçtiklerim hariç"
             Text(scopeLabel, color = C.sub, fontSize = 14.sp,
@@ -173,16 +173,18 @@ fun MainScreen(onConnect: () -> Unit, onDisconnect: () -> Unit) {
 
         // Trafik yönlendirme
         Section("Hangi trafik tünelden geçsin?") {
-            RadioRow("Sadece engelli siteler",
-                "Listedeki siteler tünelden geçer, gerisi doğrudan. En hızlı ve en az veri.",
-                s.routeMode == RouteMode.BLOCKED, badge = "ÖNERİLEN") { update { it.copy(routeMode = RouteMode.BLOCKED) } }
+            val dpi = s.method == Method.DPI
+            RadioRow("Her şey",
+                if (dpi) "Bütün bağlantılara DPI aşma uygulanır. En güvenilir, hız kaybı yok." else "Bütün trafik seçili yoldan geçer.",
+                s.routeMode == RouteMode.ALL, badge = "ÖNERİLEN") { update { it.copy(routeMode = RouteMode.ALL) } }
             Divider()
-            RadioRow("Her şey", "Bütün trafik seçili yoldan geçer.", s.routeMode == RouteMode.ALL) {
-                update { it.copy(routeMode = RouteMode.ALL) }
-            }
+            RadioRow("Sadece engelli siteler",
+                if (dpi) "Bağlantılar önce normal denenir; açılmayan siteleri uygulama kendisi öğrenir ve sadece onlara DPI aşma uygular."
+                else "Sadece listedeki siteler tünelden geçer, gerisi doğrudan. En az veri.",
+                s.routeMode == RouteMode.BLOCKED) { update { it.copy(routeMode = RouteMode.BLOCKED) } }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${s.blockedSites.size} site engelli listesinde · ", color = C.sub, fontSize = 14.sp)
+                Text("${s.blockedSites.size} site test listesinde · ", color = C.sub, fontSize = 14.sp)
                 Text("düzenle", color = C.accent, fontSize = 14.sp, modifier = Modifier.clickable { dialog = "sites" })
                 Text(" · ", color = C.sub, fontSize = 14.sp)
                 Text(if (busy == "scan") "taranıyor…" else "tara", color = C.accent, fontSize = 14.sp,
@@ -329,34 +331,45 @@ private fun MethodCard(
 private fun PowerCard(status: VpnStatus, s: Settings, onClick: () -> Unit) {
     val on = status is VpnStatus.On
     val connecting = status is VpnStatus.Connecting
-    val ring = when {
-        on -> C.green
-        connecting -> C.accent
-        status is VpnStatus.Error -> C.red
-        else -> C.border
-    }
+    val stats by VpnState.stats.collectAsState()
     val pulse by rememberInfiniteTransition(label = "p").animateFloat(
-        0.35f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "a"
+        0.3f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "a"
     )
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(on) { while (on) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(1000) } }
+
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(C.card)
-            .border(1.dp, C.border, RoundedCornerShape(28.dp)).padding(vertical = 28.dp, horizontal = 20.dp),
+            .border(1.dp, C.border, RoundedCornerShape(28.dp)).padding(vertical = 28.dp, horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Dış halka + dolu düğme
         Box(
-            Modifier.size(180.dp).clip(CircleShape).background(if (on) C.greenBg else C.inner)
-                .border(3.dp, if (connecting) ring.copy(alpha = pulse) else ring, CircleShape)
-                .clickable(onClick = onClick),
+            Modifier.size(196.dp).clip(CircleShape)
+                .border(4.dp, when {
+                    on -> C.accent.copy(alpha = 0.55f)
+                    connecting -> C.accent.copy(alpha = pulse)
+                    status is VpnStatus.Error -> C.red
+                    else -> C.border
+                }, CircleShape)
+                .padding(12.dp),
             contentAlignment = Alignment.Center
         ) {
-            val iconColor = if (on) C.green else if (connecting) C.accent else C.sub
-            Canvas(Modifier.size(64.dp)) {
-                val w = size.width
-                val stroke = w * 0.11f
-                drawArc(iconColor, -60f, 300f, false, topLeft = Offset(stroke, stroke + w * 0.06f),
-                    size = androidx.compose.ui.geometry.Size(w - 2 * stroke, w - 2 * stroke),
-                    style = Stroke(stroke, cap = StrokeCap.Round))
-                drawLine(iconColor, Offset(w / 2, stroke / 2), Offset(w / 2, w * 0.45f), stroke, StrokeCap.Round)
+            Box(
+                Modifier.fillMaxSize().clip(CircleShape)
+                    .background(if (on) C.accent else C.inner)
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                val iconColor = if (on) C.onAccent else if (connecting) C.accent else C.sub
+                Canvas(Modifier.size(68.dp)) {
+                    val w = size.width
+                    val stroke = w * 0.11f
+                    drawArc(iconColor, -60f, 300f, false, topLeft = Offset(stroke, stroke + w * 0.06f),
+                        size = androidx.compose.ui.geometry.Size(w - 2 * stroke, w - 2 * stroke),
+                        style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawLine(iconColor, Offset(w / 2, stroke / 2), Offset(w / 2, w * 0.45f), stroke, StrokeCap.Round)
+                }
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -366,21 +379,69 @@ private fun PowerCard(status: VpnStatus, s: Settings, onClick: () -> Unit) {
             is VpnStatus.Error -> "Bağlanamadı"
             VpnStatus.Off -> "Kapalı"
         }
-        Text(title, color = C.text, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text(title, color = if (on) C.accent else C.text, fontSize = 32.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         val via = when (s.method) {
-            Method.DPI -> if (s.warpFallback) "DPI aşma + WARP" else "DPI aşma"
-            Method.WARP -> "WARP"
+            Method.DPI -> "DPI aşma açık · sunucu yok"
+            Method.WARP -> "WARP · Cloudflare"
             Method.CUSTOM -> "Kendi sunucum"
         }
+        val scopeLabel = if (s.appMode == AppMode.ALL || (s.appMode == AppMode.ONLY && s.apps.isEmpty())) "tüm telefon"
+            else if (s.appMode == AppMode.ONLY) "${s.apps.size} uygulama" else "seçtiklerim hariç"
         val sub = when (status) {
-            is VpnStatus.On -> "$via · dokun, kes"
+            is VpnStatus.On -> "$via · ${elapsed(now - status.since)} · $scopeLabel"
             is VpnStatus.Connecting -> status.step
             is VpnStatus.Error -> status.message
-            VpnStatus.Off -> "Dokun, bağlan · $via"
+            VpnStatus.Off -> "Dokun, bağlan · $scopeLabel"
         }
         Text(sub, color = if (status is VpnStatus.Error) C.red else C.sub, fontSize = 15.sp, textAlign = TextAlign.Center)
+
+        if (on) {
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatBox(stats.ip ?: (if (stats.tunnelOk == false) "—" else "…"), "Görünen IP", Modifier.weight(1f))
+                StatBox(
+                    stats.pingMs?.let { "$it ms" } ?: (if (stats.tunnelOk == false) "yok" else "…"),
+                    "Gecikme", Modifier.weight(1f),
+                    color = when { stats.tunnelOk == false -> C.red; (stats.pingMs ?: 0) > 400 -> C.orange; else -> C.text }
+                )
+                StatBox(bytes(stats.rxBytes + stats.txBytes), "Bu oturum", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Text("↓ ${bytes(stats.rxSpeed)}/s   ↑ ${bytes(stats.txSpeed)}/s", color = C.sub, fontSize = 14.sp)
+            if (stats.tunnelOk == false) {
+                Spacer(Modifier.height(8.dp))
+                Text("Tünelden internete çıkılamıyor. \"Otomatik bul\"u dene ya da WARP'a geç.",
+                    color = C.red, fontSize = 13.sp, textAlign = TextAlign.Center)
+            }
+        }
     }
+}
+
+@Composable
+private fun StatBox(value: String, label: String, modifier: Modifier, color: Color = C.text) {
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp)).background(C.inner).padding(vertical = 14.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(value, color = color, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Spacer(Modifier.height(2.dp))
+        Text(label, color = C.sub, fontSize = 12.sp, maxLines = 1)
+    }
+}
+
+private fun elapsed(ms: Long): String {
+    val t = (ms / 1000).coerceAtLeast(0)
+    val h = t / 3600; val m = (t % 3600) / 60; val sec = t % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+}
+
+private fun bytes(b: Long): String = when {
+    b < 1024 -> "$b B"
+    b < 1024 * 1024 -> "%.0f KB".format(b / 1024.0)
+    b < 1024L * 1024 * 1024 -> "%.1f MB".format(b / 1048576.0)
+    else -> "%.2f GB".format(b / 1073741824.0)
 }
 
 @Composable
